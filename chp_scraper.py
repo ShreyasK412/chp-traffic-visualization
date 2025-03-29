@@ -1,115 +1,101 @@
 import requests
 from bs4 import BeautifulSoup
-import time
+import pandas as pd
 import re
 from datetime import datetime
-import pandas as pd
+import logging
 
-# List of all CHP communication centers
-CHP_CENTERS = {
-    'BFCC': 'Bakersfield',
-    'BSCC': 'Barstow',
-    'BICC': 'Bishop',
-    'BCCC': 'Border',
-    'CCCC': 'Capitol',
-    'CHCC': 'Chico',
-    'ECCC': 'El Centro',
-    'FRCC': 'Fresno',
-    'GGCC': 'Golden Gate',
-    'HMCC': 'Humboldt',
-    'INCC': 'Indio',
-    'LACC': 'Inland',
-    'LACCC': 'Los Angeles',
-    'MDCC': 'Merced',
-    'MTCC': 'Monterey',
-    'ORCC': 'Orange',
-    'RDCC': 'Redding',
-    'SLCCC': 'San Luis Obispo',
-    'STCC': 'Stockton',
-    'SVCC': 'Susanville',
-    'TKCC': 'Truckee',
-    'UKCC': 'Ukiah',
-    'VTCC': 'Ventura',
-    'YKCC': 'Yreka'
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# San Diego County CHP Communication Centers
+SD_CENTERS = {
+    'San Diego': 'SD',
+    'El Cajon': 'EC',
+    'Oceanside': 'OC'
 }
 
 def fetch_chp_data():
-    url = "https://cad.chp.ca.gov/traffic.aspx"
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Content-Type': 'application/x-www-form-urlencoded'
-    }
-    
-    all_incidents = []
-    
+    """Fetch traffic incident data from CHP website for San Diego County"""
     try:
-        print("Fetching data from CHP website...")
-        # First get the initial page to get the form data
-        session = requests.Session()
-        response = session.get(url, headers=headers)
-        response.raise_for_status()
+        all_incidents = []
         
-        # Parse the initial page
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Get the form data
-        viewstate = soup.find('input', {'id': '__VIEWSTATE'})['value']
-        viewstategenerator = soup.find('input', {'id': '__VIEWSTATEGENERATOR'})['value']
-        
-        # Fetch data for each communication center
-        for center_code, center_name in CHP_CENTERS.items():
-            print(f"Fetching data for {center_name}...")
+        for center_name, center_code in SD_CENTERS.items():
+            logger.info(f"Fetching data from {center_name} CHP center...")
             
-            # Prepare the form data
+            # CHP website URL
+            url = "https://cad.chp.ca.gov/Traffic.aspx"
+            
+            # Form data for POST request
             data = {
-                '__EVENTTARGET': 'ddlComCenter',
-                '__EVENTARGUMENT': '',
-                '__LASTFOCUS': '',
-                '__VIEWSTATE': viewstate,
-                '__VIEWSTATEGENERATOR': viewstategenerator,
-                'ddlComCenter': center_code
+                "__VIEWSTATE": "",
+                "__VIEWSTATEGENERATOR": "",
+                "__EVENTVALIDATION": "",
+                "ddlComCenter": center_code,
+                "btnSubmit": "Submit"
             }
             
+            # First request to get the form tokens
+            session = requests.Session()
+            response = session.get(url)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Extract form tokens
+            data["__VIEWSTATE"] = soup.find("input", {"name": "__VIEWSTATE"})["value"]
+            data["__VIEWSTATEGENERATOR"] = soup.find("input", {"name": "__VIEWSTATEGENERATOR"})["value"]
+            data["__EVENTVALIDATION"] = soup.find("input", {"name": "__EVENTVALIDATION"})["value"]
+            
             # Submit the form
-            response = session.post(url, data=data, headers=headers)
-            response.raise_for_status()
+            response = session.post(url, data=data)
+            soup = BeautifulSoup(response.text, 'html.parser')
             
-            # Parse the incidents using regex
-            pattern = r'<td[^>]*>(\d{4})</td><td[^>]*>(\d{1,2}:\d{2} [AP]M)</td><td[^>]*>([^<]+)</td><td[^>]*>([^<]+)</td><td[^>]*>([^<]*)</td><td[^>]*>([^<]+)</td>'
+            # Find the table with incident data
+            table = soup.find('table', {'id': 'gvIncidents'})
+            if not table:
+                logger.warning(f"No incidents found for {center_name}")
+                continue
             
-            matches = re.finditer(pattern, response.text)
-            for match in matches:
-                incident = {
-                    'incident_number': match.group(1),
-                    'time': match.group(2),
-                    'type': match.group(3).strip(),
-                    'location': match.group(4).strip(),
-                    'location_desc': match.group(5).strip(),
-                    'area': match.group(6).strip(),
-                    'center': center_name,
-                    'center_code': center_code,
-                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                }
-                all_incidents.append(incident)
-            
-            # Add a small delay to avoid overwhelming the server
-            time.sleep(1)
+            # Extract incidents
+            rows = table.find_all('tr')[1:]  # Skip header row
+            for row in rows:
+                cols = row.find_all('td')
+                if len(cols) >= 6:
+                    incident = {
+                        'timestamp': cols[0].text.strip(),
+                        'incident_type': cols[1].text.strip(),
+                        'location': cols[2].text.strip(),
+                        'description': cols[3].text.strip(),
+                        'center': center_name,
+                        'status': cols[5].text.strip()
+                    }
+                    all_incidents.append(incident)
         
-        print(f"Found {len(all_incidents)} total incidents across all centers")
-        return all_incidents
-    
+        if all_incidents:
+            # Convert to DataFrame and save to CSV
+            df = pd.DataFrame(all_incidents)
+            df.to_csv('sd_incidents.csv', index=False)
+            logger.info(f"Successfully saved {len(all_incidents)} incidents to sd_incidents.csv")
+            return all_incidents
+        else:
+            logger.warning("No incidents found")
+            return None
+            
     except Exception as e:
-        print(f"Error fetching data: {e}")
+        logger.error(f"Error fetching CHP data: {e}")
         return None
 
-def save_to_csv(incidents, filename='chp_incidents.csv'):
-    if incidents:
+def save_to_csv(incidents):
+    """Save incidents to CSV file"""
+    try:
         df = pd.DataFrame(incidents)
-        df.to_csv(filename, index=False)
-        print(f"Data saved to {filename}")
-    else:
-        print("No data to save")
+        df.to_csv('sd_incidents.csv', index=False)
+        logger.info(f"Successfully saved {len(incidents)} incidents to sd_incidents.csv")
+    except Exception as e:
+        logger.error(f"Error saving incidents to CSV: {e}")
 
 if __name__ == "__main__":
-    incidents = fetch_chp_data()
-    save_to_csv(incidents) 
+    fetch_chp_data() 
