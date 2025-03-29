@@ -15,7 +15,7 @@ This project scrapes traffic incident data from the California Highway Patrol (C
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/chp-traffic-visualization.git
+git clone https://github.com/ShreyasK412/chp-traffic-visualization.git
 cd chp-traffic-visualization
 ```
 
@@ -32,20 +32,28 @@ pip install -r requirements.txt
 
 ## Usage
 
-1. Run the scraper to fetch the latest data:
+Run the complete pipeline with a single command:
 ```bash
-python chp_scraper.py
+python run.py
 ```
 
-2. Generate the visualization:
+This will:
+1. Fetch the latest incident data from CHP
+2. Generate the interactive map visualization
+3. Save the result as 'san_diego_incidents.html'
+
+Alternatively, you can run the steps separately:
 ```bash
+# Step 1: Fetch data
+python chp_scraper.py
+
+# Step 2: Generate visualization
 python visualize_incidents.py
 ```
 
-3. Open `san_diego_incidents.html` in your web browser to view the map.
-
 ## Project Structure
 
+- `run.py`: Main script that runs the complete pipeline
 - `chp_scraper.py`: Scrapes incident data from CHP website
 - `visualize_incidents.py`: Creates interactive map visualization
 - `requirements.txt`: Lists required Python packages
