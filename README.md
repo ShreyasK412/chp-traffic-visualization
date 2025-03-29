@@ -1,6 +1,6 @@
 # CHP Traffic Incident Visualization
 
-This project scrapes traffic incident data from the California Highway Patrol (CHP) website and creates an interactive visualization using Folium. The visualization shows traffic incidents across all of California, with color-coded markers and a heatmap layer to highlight incident density.
+This project scrapes traffic incident data from the California Highway Patrol (CHP) website and creates an interactive visualization using Folium. The visualization shows traffic incidents across all of California, with color-coded markers and a heatmap layer to highlight incident density. The project also includes machine learning models to predict incident types based on various features.
 
 ## Features
 
@@ -17,6 +17,11 @@ This project scrapes traffic incident data from the California Highway Patrol (C
   - Incidents by communication center
   - Most common locations
   - Time-based analysis
+- Machine Learning Predictions:
+  - Random Forest and XGBoost models for incident type prediction
+  - Features include time, weather, and seasonal factors
+  - Model performance evaluation and comparison
+  - Saved models for future use
 
 ## Prerequisites
 
@@ -24,6 +29,7 @@ This project scrapes traffic incident data from the California Highway Patrol (C
 - Chrome browser (for Selenium)
 - ChromeDriver (matching your Chrome version)
 - Apache Spark (for data processing)
+- scikit-learn and XGBoost (for ML predictions)
 
 ## Installation
 
@@ -53,8 +59,9 @@ python run.py
 This will:
 1. Fetch the latest incident data from all CHP centers
 2. Process the data using Spark for analysis
-3. Generate an interactive map visualization
-4. Save the result as `california_incidents.html`
+3. Train machine learning models for incident prediction
+4. Generate an interactive map visualization
+5. Save the result as `california_incidents.html`
 
 Alternatively, you can run the steps separately:
 ```bash
@@ -64,6 +71,9 @@ python -c "from chp_scraper import fetch_chp_data; fetch_chp_data()"
 # Process data with Spark
 python -c "from spark_processor import process_incidents; process_incidents()"
 
+# Train ML models
+python -c "from ml_predictor import IncidentPredictor; IncidentPredictor().train_models()"
+
 # Generate visualization
 python -c "from visualize_incidents import create_incident_map; create_incident_map()"
 ```
@@ -72,10 +82,21 @@ python -c "from visualize_incidents import create_incident_map; create_incident_
 
 - `chp_scraper.py`: Scrapes incident data from all CHP communication centers
 - `spark_processor.py`: Processes and analyzes the incident data using Spark
+- `ml_predictor.py`: Trains and uses ML models for incident prediction
 - `visualize_incidents.py`: Creates the interactive map visualization
 - `run.py`: Main script that runs the complete pipeline
 - `requirements.txt`: Lists all required Python packages
 - `california_incidents.html`: Generated visualization file
+- `models/`: Directory containing trained ML models
+
+## Machine Learning Features
+
+The ML models use the following features to predict incident types:
+- Time-based features (hour, day of week, month)
+- Weather conditions (rain, fog)
+- Holiday and seasonal indicators
+- Rush hour periods
+- Weekend/weekday indicators
 
 ## Data Sources
 

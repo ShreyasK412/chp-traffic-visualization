@@ -1,6 +1,7 @@
 from chp_scraper import fetch_chp_data
 from spark_processor import process_incidents
 from visualize_incidents import create_incident_map
+from ml_predictor import IncidentPredictor
 import time
 
 def main():
@@ -20,12 +21,18 @@ def main():
         print("Error processing data. Exiting...")
         return
     
-    # Step 3: Create visualization
-    print("\nStep 3: Creating map visualization...")
+    # Step 3: Train ML models
+    print("\nStep 3: Training machine learning models...")
+    predictor = IncidentPredictor()
+    predictor.train_models()
+    
+    # Step 4: Create visualization
+    print("\nStep 4: Creating map visualization...")
     create_incident_map()
     
     print("\nPipeline completed successfully!")
     print("You can now open 'california_incidents.html' in your web browser to view the map.")
+    print("Trained ML models are saved in the 'models' directory.")
 
 if __name__ == "__main__":
     main() 
