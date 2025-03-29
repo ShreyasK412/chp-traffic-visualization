@@ -19,17 +19,23 @@ This project scrapes traffic incident data from the California Highway Patrol (C
   - Time-based analysis
 - Machine Learning Predictions:
   - Random Forest and XGBoost models for incident type prediction
-  - Features include time, weather, and seasonal factors
+  - Rich feature set including:
+    - Time-based features (hour, day of week, month)
+    - Weather conditions (rain, fog) from OpenWeatherMap API
+    - Holiday and seasonal indicators
+    - Location-based features (latitude, longitude)
+    - Historical incident density
+    - Rush hour periods
+    - Weekend/weekday indicators
   - Model performance evaluation and comparison
   - Saved models for future use
+  - Geocoding with caching for efficiency
 
 ## Prerequisites
 
 - Python 3.8+
-- Chrome browser (for Selenium)
-- ChromeDriver (matching your Chrome version)
 - Apache Spark (for data processing)
-- scikit-learn and XGBoost (for ML predictions)
+- OpenWeatherMap API key (for weather data)
 
 ## Installation
 
@@ -44,10 +50,11 @@ cd chp-traffic-visualization
 pip install -r requirements.txt
 ```
 
-3. Download ChromeDriver:
-   - Visit [ChromeDriver downloads](https://sites.google.com/chromium.org/driver/)
-   - Download the version matching your Chrome browser
-   - Add it to your system PATH
+3. Set up environment variables:
+   Create a `.env` file in the project root with:
+   ```
+   OPENWEATHERMAP_API_KEY=your_api_key_here
+   ```
 
 ## Usage
 
@@ -88,20 +95,36 @@ python -c "from visualize_incidents import create_incident_map; create_incident_
 - `requirements.txt`: Lists all required Python packages
 - `california_incidents.html`: Generated visualization file
 - `models/`: Directory containing trained ML models
+- `location_cache.json`: Cached geocoding results
+- `.env`: Environment variables (API keys)
 
 ## Machine Learning Features
 
 The ML models use the following features to predict incident types:
-- Time-based features (hour, day of week, month)
-- Weather conditions (rain, fog)
-- Holiday and seasonal indicators
-- Rush hour periods
-- Weekend/weekday indicators
+- Time-based features:
+  - Hour of day
+  - Day of week
+  - Month
+  - Rush hour periods
+  - Weekend/weekday indicators
+- Weather conditions:
+  - Rain status
+  - Fog status
+  (via OpenWeatherMap API)
+- Holiday and seasonal indicators:
+  - US holidays
+  - Holiday season (December/January)
+- Location-based features:
+  - Latitude
+  - Longitude
+  - Historical incident density (within 5km radius)
 
 ## Data Sources
 
 - CHP Traffic Incident Information Page: [CHP Website](https://cad.chp.ca.gov/Traffic.aspx)
 - California State Boundary: [US Census Bureau](https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html)
+- Weather Data: [OpenWeatherMap API](https://openweathermap.org/api)
+- Holiday Calendar: [holidays](https://github.com/dr-prodigy/python-holidays) package
 
 ## License
 
