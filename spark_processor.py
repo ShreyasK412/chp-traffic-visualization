@@ -1,85 +1,81 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import *
-from pyspark.sql.types import *
-import pandas as pd
-from datetime import datetime
+from pyspark.sql.functions import col, count, desc
+import logging
 
-def create_spark_session():
-    return SparkSession.builder \
-        .appName("CHP Traffic Analysis") \
-        .config("spark.jars.packages", "io.delta:delta-core_2.12:2.4.0") \
-        .getOrCreate()
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 def process_incidents():
-    spark = create_spark_session()
-    
-    # Read the CSV file
-    df = spark.read.csv("chp_incidents.csv", header=True, inferSchema=True)
-    
-    # Register the DataFrame as a temporary view
-    df.createOrReplaceTempView("incidents")
-    
-    # Perform some analysis
-    print("\nIncident Analysis:")
-    
-    # 1. Total incidents by type
-    print("\nIncidents by Type:")
-    type_counts = spark.sql("""
-        SELECT type, COUNT(*) as count
-        FROM incidents
-        GROUP BY type
-        ORDER BY count DESC
-    """).show()
-    
-    # 2. Incidents by communication center
-    print("\nIncidents by Communication Center:")
-    center_counts = spark.sql("""
-        SELECT center, COUNT(*) as count
-        FROM incidents
-        GROUP BY center
-        ORDER BY count DESC
-    """).show()
-    
-    # 3. Most common locations
-    print("\nMost Common Locations:")
-    location_counts = spark.sql("""
-        SELECT location, COUNT(*) as count
-        FROM incidents
-        GROUP BY location
-        ORDER BY count DESC
-        LIMIT 10
-    """).show()
-    
-    # 4. Time-based analysis
-    print("\nIncidents by Hour:")
-    time_counts = spark.sql("""
-        SELECT 
-            SUBSTRING(time, 1, 2) as hour,
-            COUNT(*) as count
-        FROM incidents
-        GROUP BY hour
-        ORDER BY hour
-    """).show()
-    
-    # Save processed data for visualization
-    processed_df = df.select(
-        "incident_number",
-        "time",
-        "type",
-        "location",
-        "area",
-        "center",
-        "center_code"
-    )
-    
-    # Convert to pandas for visualization
-    processed_pdf = processed_df.toPandas()
-    
-    # Save to CSV for visualization
-    processed_pdf.to_csv('processed_incidents.csv', index=False)
-    print("\nProcessed data saved to 'processed_incidents.csv'")
-    
-    return processed_pdf
+    """Process incident data using Spark"""
+    try:
+        # Initialize Spark session
+        logger.info("Initializing Spark session...")
+        spark = SparkSession.builder \
+            .appName("CHP Incident Analysis") \
+            .config("spark.driver.memory", "2g") \
+            .getOrCreate()
+        
+        # Read the CSV file
+        logger.info("Reading incident data from CSV...")
+        df = spark.read.csv("chp_incidents.csv", header=True, inferSchema=True)
+        
+        # Register the DataFrame as a temporary view
+        df.createOrReplaceTempView("incidents")
+        
+        # Analyze incidents by type
+        logger.info("Analyzing incidents by type...")
+        incident_types = spark.sql("""
+            SELECT incident_type, COUNT(*) as count
+            FROM incidents
+            GROUP BY incident_type
+            ORDER BY count DESC
+        """)
+        
+        # Analyze incidents by area
+        logger.info("Analyzing incidents by area...")
+        incident_areas = spark.sql("""
+            SELECT area, COUNT(*) as count
+            FROM incidents
+            GROUP BY area
+            ORDER BY count DESC
+        """)
+        
+        # Analyze incidents by time of day
+        logger.info("Analyzing incidents by time of day...")
+        incident_times = spark.sql("""
+            SELECT 
+                HOUR(CAST(timestamp AS TIMESTAMP)) as hour,
+                COUNT(*) as count
+            FROM incidents
+            GROUP BY hour
+            ORDER BY hour
+        """)
+        
+        # Save results
+        logger.info("Saving analysis results...")
+        incident_types.write.mode("overwrite").csv("incident_types_analysis")
+        incident_areas.write.mode("overwrite").csv("incident_areas_analysis")
+        incident_times.write.mode("overwrite").csv("incident_times_analysis")
+        
+        logger.info("Analysis completed successfully")
+        
+        return {
+            'types': incident_types.collect(),
+            'areas': incident_areas.collect(),
+            'times': incident_times.collect()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing incidents: {e}")
+        raise
+    finally:
+        # Stop Spark session
+        if 'spark' in locals():
+            spark.stop()
 
 if __name__ == "__main__":
     process_incidents() 

@@ -1,21 +1,41 @@
-# San Diego CHP Traffic Incident Monitor
+# CHP Traffic Incident Visualization and Analysis
 
-This project monitors traffic incidents in San Diego County by scraping data from the California Highway Patrol (CHP) website. It provides automated summaries of incidents and sends email notifications with incident details.
+A comprehensive system for collecting, analyzing, and visualizing California Highway Patrol (CHP) traffic incidents. The system includes data collection, processing, and visualization capabilities.
 
 ## Features
 
-- Real-time monitoring of San Diego County CHP incidents
-- Automated incident summarization using T5 model
-- Beautiful HTML email notifications
-- Incident grouping by type
-- Location-based incident tracking
-- Detailed logging and error handling
+### 1. Data Collection
+- Automated scraping of CHP incident data
+- Real-time data updates
+- Structured data storage in CSV format
+- Error handling and logging
+
+### 2. Data Processing
+- Apache Spark-based data processing
+- Incident type analysis
+- Area-based analysis
+- Time-based analysis
+- Historical incident density calculation
+
+### 3. Visualization
+- Interactive map visualization using Folium
+- Color-coded incident markers
+- Incident clustering for better visibility
+- Detailed popup information
+- Full-screen mode
+- Layer controls
+- Custom legend
+
+### 4. Email Reporting
+- Automated incident summaries
+- Interactive map attachments
+- Configurable email settings
 
 ## Prerequisites
 
 - Python 3.8+
-- Gmail account (for sending notifications)
-- Sufficient disk space for the T5 model (~1GB)
+- Apache Spark
+- Required Python packages (see requirements.txt)
 
 ## Installation
 
@@ -25,77 +45,88 @@ git clone https://github.com/ShreyasK412/chp-traffic-visualization.git
 cd chp-traffic-visualization
 ```
 
-2. Install required packages:
+2. Create and activate a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+3. Install required packages:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Set up environment variables:
-   Create a `.env` file in the project root with:
-   ```
-   EMAIL_USER=your_email@gmail.com
-   EMAIL_RECEIVER=recipient_email@gmail.com
-   EMAIL_PASSWORD=your_app_specific_password
-   SMTP_SERVER=smtp.gmail.com
-   SMTP_PORT=587
-   ```
-
-   Note: For Gmail, you'll need to:
-   1. Enable 2-factor authentication
-   2. Generate an App Password (Google Account → Security → App Passwords)
-   3. Use the App Password in the EMAIL_PASSWORD field
+4. Set up environment variables:
+Create a `.env` file with the following variables:
+```
+CHP_URL=<CHP website URL>
+EMAIL_USER=<your email>
+EMAIL_PASSWORD=<your email password>
+EMAIL_RECIPIENTS=<comma-separated list of recipients>
+```
 
 ## Usage
 
-You can run the complete pipeline with a single command:
+### 1. Data Collection
+```bash
+python chp_scraper.py
+```
+
+### 2. Data Processing
+```bash
+python spark_processor.py
+```
+
+### 3. Visualization
+```bash
+python visualize_incidents.py
+```
+
+### 4. Complete Pipeline
 ```bash
 python run.py
 ```
 
-This will:
-1. Fetch the latest incident data from San Diego County CHP centers
-2. Process and summarize the incidents
-3. Send an email notification with incident details
-
-Alternatively, you can run the steps separately:
-```bash
-# Fetch data
-python -c "from chp_scraper import fetch_chp_data; fetch_chp_data()"
-
-# Generate and send summary
-python -c "from incident_summarizer import IncidentSummarizer; IncidentSummarizer().main()"
-```
-
 ## Project Structure
 
-- `chp_scraper.py`: Scrapes incident data from San Diego County CHP centers
-- `incident_summarizer.py`: Summarizes incidents and sends email notifications
-- `run.py`: Main script that runs the complete pipeline
-- `requirements.txt`: Lists all required Python packages
-- `sd_incidents.csv`: Stores incident data
-- `.env`: Environment variables (email configuration)
+```
+chp-traffic-visualization/
+├── chp_scraper.py          # Data collection from CHP website
+├── spark_processor.py      # Spark-based data processing
+├── spark_visualization.py  # Spark-based visualization
+├── visualize_incidents.py  # Basic visualization
+├── incident_summarizer.py  # Email reporting
+├── run.py                  # Main pipeline script
+├── requirements.txt        # Python dependencies
+├── .env                    # Environment variables
+├── .gitignore             # Git ignore rules
+└── README.md              # This file
+```
 
-## Email Notifications
+## Output Files
 
-The system sends HTML-formatted emails containing:
-- Total number of incidents
-- Incidents grouped by type
-- Summarized descriptions
-- Timestamps and locations
-- Clean, readable formatting
-
-## Data Sources
-
-- CHP Traffic Incident Information Page: [CHP Website](https://cad.chp.ca.gov/Traffic.aspx)
-- San Diego County CHP Communication Centers:
-  - San Diego
-  - El Cajon
-  - Oceanside
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- `chp_incidents.csv`: Raw incident data
+- `incident_map.html`: Interactive map visualization
+- `spark_analysis_map.html`: Spark-based analysis visualization
+- `incident_types_analysis/`: Spark analysis results
+- `incident_areas_analysis/`: Area-based analysis
+- `incident_times_analysis/`: Time-based analysis
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. 
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- California Highway Patrol for providing incident data
+- OpenStreetMap for map tiles
+- Apache Spark community
+- Folium library contributors 
