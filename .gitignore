@@ -32,6 +32,16 @@ ENV/
 *.swo
 
 # Project specific
+config/.env
+data/raw/*.csv
+data/processed/*
+!data/processed/.gitkeep
+visualization/*.html
+models/*
+!models/.gitkeep
+*.log
+
+# Project specific
 .env
 *.csv
 *.html
