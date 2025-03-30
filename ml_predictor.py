@@ -15,6 +15,9 @@ from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut
 import json
 import logging
+import time
+import requests
+from requests.exceptions import RequestException
 
 # Set up logging
 logging.basicConfig(
@@ -43,6 +46,7 @@ class IncidentPredictor:
         # Initialize geocoder with caching
         self.geocoder = Nominatim(user_agent="chp_incident_predictor")
         self.location_cache = {}
+        self.weather_cache = {}
         self.load_location_cache()
         
     def load_location_cache(self):
@@ -62,45 +66,89 @@ class IncidentPredictor:
         except Exception as e:
             logger.warning(f"Error saving location cache: {e}")
     
-    def get_coordinates(self, location):
-        """Get coordinates for a location with caching"""
-        if location in self.location_cache:
-            return self.location_cache[location]
-        
+    def get_coordinates(self, location, area):
+        """Get coordinates for a location using geocoding with caching"""
         try:
-            location_data = self.geocoder.geocode(location + ", California")
-            if location_data:
-                coords = (location_data.latitude, location_data.longitude)
-                self.location_cache[location] = coords
-                self.save_location_cache()
-                return coords
-        except GeocoderTimedOut:
-            logger.warning(f"Geocoding timeout for location: {location}")
+            # Check cache first
+            if location in self.location_cache:
+                return self.location_cache[location]
+            
+            # Try to geocode the location
+            try:
+                # Add area to location for better accuracy
+                full_location = f"{location}, {area}, California"
+                location_data = self.geocoder.geocode(full_location)
+                
+                if location_data:
+                    coords = [location_data.latitude, location_data.longitude]
+                    self.location_cache[location] = coords
+                    self.save_location_cache()
+                    return coords
+                else:
+                    logger.warning(f"Could not find coordinates for location: {location}")
+                    return None
+                    
+            except GeocoderTimedOut:
+                logger.warning(f"Geocoding timed out for location: {location}")
+                return None
+                
         except Exception as e:
-            logger.error(f"Error geocoding location {location}: {e}")
-        
-        return None
+            logger.error(f"Error getting coordinates for location {location}: {e}")
+            return None
     
     def get_weather_data(self, lat, lon, timestamp):
-        """Get weather data for a location and time"""
+        """Get weather data for a location and time with caching"""
         try:
-            weather_data = self.weather_api.get_historical_weather(
-                lat=lat,
-                lon=lon,
-                timestamp=timestamp
-            )
-            return {
-                'is_rainy': 1 if weather_data.get('rain', 0) > 0 else 0,
-                'is_foggy': 1 if weather_data.get('visibility', 10000) < 1000 else 0
-            }
+            # Create cache key
+            cache_key = f"{lat}_{lon}_{timestamp}"
+            
+            # Check cache first
+            if cache_key in self.weather_cache:
+                return self.weather_cache[cache_key]
+            
+            # Convert timestamp to datetime
+            dt = datetime.strptime(timestamp, '%Y-%m-%d %H:%M')
+            
+            # Get weather data from OpenWeatherMap API
+            api_key = os.getenv('OPENWEATHER_API_KEY')
+            if not api_key:
+                logger.warning("OpenWeather API key not found, using default weather values")
+                return [0, 0, 0]  # Default values
+            
+            url = f"http://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}"
+            
+            # Try up to 3 times with exponential backoff
+            for attempt in range(3):
+                try:
+                    response = requests.get(url, timeout=5)
+                    response.raise_for_status()
+                    weather_data = response.json()
+                    
+                    # Extract relevant weather features
+                    features = [
+                        weather_data.get('main', {}).get('temp', 0),
+                        weather_data.get('main', {}).get('humidity', 0),
+                        weather_data.get('weather', [{}])[0].get('main', 'Clear')
+                    ]
+                    
+                    # Cache the results
+                    self.weather_cache[cache_key] = features
+                    return features
+                    
+                except RequestException as e:
+                    if attempt == 2:  # Last attempt
+                        logger.error(f"Failed to get weather data after 3 attempts: {e}")
+                        return [0, 0, 0]  # Default values
+                    time.sleep(2 ** attempt)  # Exponential backoff
+            
         except Exception as e:
-            logger.error(f"Error fetching weather data: {e}")
-            return {'is_rainy': 0, 'is_foggy': 0}
+            logger.error(f"Error getting weather data: {e}")
+            return [0, 0, 0]  # Default values
     
     def calculate_historical_density(self, df, location):
         """Calculate historical incident density for a location"""
         try:
-            coords = self.get_coordinates(location)
+            coords = self.get_coordinates(location, '')
             if not coords:
                 return 0
             
@@ -141,26 +189,27 @@ class IncidentPredictor:
             # Add weather features
             weather_data = []
             for _, row in df.iterrows():
-                coords = self.get_coordinates(row['location'])
+                coords = self.get_coordinates(row['location'], row['area'])
                 if coords:
                     weather = self.get_weather_data(
                         coords[0], coords[1],
-                        row['timestamp'].timestamp()
+                        row['timestamp'].strftime('%Y-%m-%d %H:%M')
                     )
                     weather_data.append(weather)
                 else:
-                    weather_data.append({'is_rainy': 0, 'is_foggy': 0})
+                    weather_data.append([0, 0, 'Clear'])
             
-            weather_df = pd.DataFrame(weather_data)
-            df['is_rainy'] = weather_df['is_rainy']
-            df['is_foggy'] = weather_df['is_foggy']
+            weather_df = pd.DataFrame(weather_data, columns=['temperature', 'humidity', 'weather_condition'])
+            df['temperature'] = weather_df['temperature']
+            df['humidity'] = weather_df['humidity']
+            df['weather_condition'] = weather_df['weather_condition']
             
             # Add location features
             df['latitude'] = df['location'].apply(
-                lambda x: self.get_coordinates(x)[0] if self.get_coordinates(x) else 0
+                lambda x: self.get_coordinates(x, '')[0] if self.get_coordinates(x, '') else 0
             )
             df['longitude'] = df['location'].apply(
-                lambda x: self.get_coordinates(x)[1] if self.get_coordinates(x) else 0
+                lambda x: self.get_coordinates(x, '')[1] if self.get_coordinates(x, '') else 0
             )
             
             # Add historical density
