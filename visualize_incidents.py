@@ -153,7 +153,7 @@ def main():
     try:
         # Load the incidents data
         logger.info("Loading incidents data...")
-        df = pd.read_csv('sd_incidents.csv')
+        df = pd.read_csv('chp_incidents.csv')
         
         if df.empty:
             logger.warning("No incidents found in CSV file")

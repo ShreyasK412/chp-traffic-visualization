@@ -1,38 +1,42 @@
-from chp_scraper import fetch_chp_data
-from spark_processor import process_incidents
-from visualize_incidents import create_incident_map
-from ml_predictor import IncidentPredictor
-import time
+import logging
+from chp_scraper import get_incidents
+from visualize_incidents import create_map
+from incident_summarizer import main as summarize_incidents
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 def main():
-    print("Starting CHP Traffic Incident Visualization Pipeline...")
-    
-    # Step 1: Fetch data from all CHP centers
-    print("\nStep 1: Fetching incident data from all CHP centers...")
-    incidents = fetch_chp_data()
-    if not incidents:
-        print("No incidents found. Exiting...")
-        return
-    
-    # Step 2: Process data with Spark
-    print("\nStep 2: Processing data with Spark...")
-    processed_data = process_incidents()
-    if processed_data is None:
-        print("Error processing data. Exiting...")
-        return
-    
-    # Step 3: Train ML models
-    print("\nStep 3: Training machine learning models...")
-    predictor = IncidentPredictor()
-    predictor.train_models()
-    
-    # Step 4: Create visualization
-    print("\nStep 4: Creating map visualization...")
-    create_incident_map()
-    
-    print("\nPipeline completed successfully!")
-    print("You can now open 'california_incidents.html' in your web browser to view the map.")
-    print("Trained ML models are saved in the 'models' directory.")
+    """Main function to run the entire pipeline"""
+    try:
+        # Step 1: Fetch incidents
+        logger.info("Fetching incidents from CHP website...")
+        df = get_incidents()
+        
+        if df is None or df.empty:
+            logger.error("No incidents found")
+            return
+        
+        # Step 2: Create visualization
+        logger.info("Creating incident map...")
+        map_file = create_map(df)
+        
+        if map_file:
+            logger.info(f"Map saved as {map_file}")
+        else:
+            logger.error("Failed to create map")
+        
+        # Step 3: Generate summary and send email
+        logger.info("Generating incident summary and sending email...")
+        summarize_incidents()
+        
+    except Exception as e:
+        logger.error(f"Error in main function: {e}")
+        raise
 
 if __name__ == "__main__":
     main() 
