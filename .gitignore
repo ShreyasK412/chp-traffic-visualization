@@ -32,5 +32,10 @@ ENV/
 *.swo
 
 # Project specific
+.env
+*.csv
+*.html
+*.png
+*.log
 chp_page.html
 san_diego_incidents.html 
